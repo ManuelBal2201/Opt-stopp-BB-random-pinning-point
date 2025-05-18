@@ -24,6 +24,65 @@ def optimal_stopping_Brownian_bridge(t, r):
 
 
 # Theoretical optimal stopping boundary for a Normal distribution with standard deviation lower than 1
+## Computation of error
+def compute_error(boundary_new, boundary):
+    """
+    Compute relative error between iterations for convergence check.
+    
+    Parameters:
+    - boundary_new (np.array): Boundary obtained in the current iteration.
+    - boundary (np.array): Boundary obtained in the previous iteration.
+    
+    Returns:
+    - error (np.array): Relative error between iterations.
+    
+    """
+    numerator = np.linalg.norm(boundary_new - boundary)
+    denominator = np.linalg.norm(boundary_new)
+    return numerator / denominator if denominator != 0 else float('inf')
+
+
+## f_t for u ARREGLAR
+def f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo"):
+    """
+    
+    
+    Parameters:
+    - m (float): Mean of the distribution.
+    - gamma (float): Standard deviation of the distribution.
+    - t (float): Actual time t_n.
+    - b_t (float): Actual value of the boundary.
+    - u (np.array): 
+    - eval_mesh (np.array):
+    - b_tu (np.array): Boundary value for eval_mesh times.
+    - pers (string):
+    
+    Returns:
+    - f_sup (np.array):
+    
+    """
+    c1 = (1 - gamma**2) # Constant 1
+    c2 = 1 / c1  # Constant 2
+    c3 = m * c2  # Constant 3
+            
+    # Mean and standard deviation
+    if (pers == "Abel"):
+        means = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-eval_mesh*c1)) - c3)
+        sigmas = np.sqrt(u - (u**2)/(c2 - t))
+    else:
+        means = b_t + (u/(1-t))*(m-b_t)
+        sigmas = np.sqrt((u/(1-t))**2*gamma**2+ (1-eval_mesh)*u/(1-t))    
+    
+    # Normal distribution functions
+    norm_cdf_sup = norm.cdf((b_tu - means) / sigmas)
+    norm_pdf_sup = norm.pdf((b_tu - means) / sigmas)
+    
+    # f_
+    f_sup = (1/(c2-eval_mesh))*(c3-(means * (1-norm_cdf_sup) + sigmas * norm_pdf_sup))
+    
+    return f_sup
+
+
 ## Perspectiva Abel
 def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
     """
@@ -41,18 +100,10 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
     """
     N = len(mesh) # Number of temporal steps
     c1 = (1 - gamma**2) # Constant 1
-    c2 = 1 / c1  # Constant 2
-    c3 = m * c2  # Constant 3
-    boundary = np.full(N, c3)  # Initialize boundary with initial guess
+    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
     delta = np.diff(mesh) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
-
-    def compute_error(boundary_new, boundary):
-        """Computes relative error between iterations for convergence check."""
-        numerator = np.sum((boundary_new - boundary)**2)
-        denominator = np.sum(boundary_new**2)
-        return np.sqrt(numerator / denominator) if denominator != 0 else float('inf')
 
     for iter in range(max_iter):
         boundary_new = boundary.copy()
@@ -63,15 +114,8 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
             eval_mesh = mesh[i+1:]  # Consider future times
             u = delta[i:]
             b_tu = boundary[i+1:] # b(t+u) for all u
-
-            means = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-eval_mesh*c1)) - c3)
-            sigmas = np.clip(np.sqrt(u - (u**2)/(c2 - t)), 1e-8, None)
-
-
-            norm_cdf_sup = norm.cdf((b_tu - means) / sigmas)
-            norm_pdf_sup = norm.pdf((b_tu - means) / sigmas)
-
-            f_sup = (1/(c2-eval_mesh))*(c3-(means * (1-norm_cdf_sup) + sigmas * norm_pdf_sup))
+            
+            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Abel")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -115,12 +159,6 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
-    def compute_error(boundary_new, boundary):
-        """Computes relative error between iterations for convergence check."""
-        numerator = np.sum((boundary_new - boundary)**2)
-        denominator = np.sum(boundary_new**2)
-        return np.sqrt(numerator / denominator) if denominator != 0 else float('inf')
-
     for iter in range(max_iter):
         boundary_new = boundary.copy()
 
@@ -130,14 +168,8 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
             eval_mesh = mesh[i+1:]  # Consider future times
             u = delta[i:]
             b_tu = boundary[i+1:] # b(t+u) for all u
-
-            means = b_t + (u/(1-t))*(m-b_t)
-            sigmas = np.sqrt((u/(1-t))**2*gamma**2+ (1-eval_mesh)*u/(1-t))
-
-            norm_cdf_sup = norm.cdf((b_tu - means) / sigmas)
-            norm_pdf_sup = norm.pdf((b_tu - means) / sigmas)
-
-            f_sup = (1/(c2-eval_mesh))*(c3-(means * (1-norm_cdf_sup) + sigmas * norm_pdf_sup))
+            
+            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
