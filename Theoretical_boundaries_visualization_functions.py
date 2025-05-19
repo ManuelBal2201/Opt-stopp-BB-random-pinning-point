@@ -46,7 +46,7 @@ def compute_error(boundary_new, boundary):
 
 
 ## f_t evaluated in the upper limits of the integrals
-def f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo"):
+def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
     """
     f_t evaluated in the upper limits of the integrals.
     
@@ -55,9 +55,8 @@ def f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo"):
     - gamma (float): Standard deviation of the distribution.
     - t (float): Actual time t_n.
     - b_t (float): Actual value of the boundary.
-    - u (np.array): Step between consecutives times of the eval_mesh.
-    - eval_mesh (np.array): Points of the temporal grid that are the upper limits of the integrals.
-    - b_tu (np.array): Boundary value for eval_mesh times.
+    - u (float): Step that it is considered.
+    - b_tu (float): Boundary value for eval_mesh times.
     - pers (string): Perspective chosen. Eduardo or Abel
     
     Returns:
@@ -70,18 +69,18 @@ def f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo"):
             
     # Mean and standard deviation
     if (pers == "Abel"):
-        means = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-eval_mesh*c1)) - c3)
-        sigmas = np.sqrt(u - (u**2)/(c2 - t))
+        mean = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-(t+u)*c1)) - c3)
+        sigma = np.sqrt(u - (u**2)/(c2 - t))
     else:
-        means = b_t + (u/(1-t))*(m-b_t)
-        sigmas = np.sqrt((u/(1-t))**2*gamma**2+ (1-eval_mesh)*u/(1-t))    
+        mean = b_t + (u/(1-t))*(m-b_t)
+        sigma = np.sqrt((u/(1-t))**2*gamma**2+ (1-t-u)*u/(1-t))    
     
     # Normal distribution functions
-    norm_cdf_sup = norm.cdf((b_tu - means) / sigmas)
-    norm_pdf_sup = norm.pdf((b_tu - means) / sigmas)
+    norm_cdf_sup = norm.cdf((b_tu - mean) / sigma)
+    norm_pdf_sup = norm.pdf((b_tu - mean) / sigma)
     
     # f_t(u) for u that t+u is in eval_mesh
-    f_sup = (1/(c2-eval_mesh))*(c3-(means * (1-norm_cdf_sup) + sigmas * norm_pdf_sup))
+    f_sup = (1/(c2-t-u))*(c3-(mean * (1-norm_cdf_sup) + sigma * norm_pdf_sup))
     
     return f_sup
 
@@ -104,7 +103,6 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
     N = len(mesh)-1 # Number of temporal steps removing the last step
     c1 = (1 - gamma**2) # Constant 1
     boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-    delta = np.diff(mesh[:-1]) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -115,10 +113,10 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
             t = mesh[i]
             b_t = boundary[i] # b(t)
             eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = delta[i:]
+            u = eval_mesh-t
             b_tu = boundary[i+1:] # b(t+u) for all u
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Abel")
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Abel")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -155,7 +153,6 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
     N = len(mesh)-1 # Number of temporal steps removing the last step
     c1 = (1 - gamma**2) # Constant 1
     boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-    delta = np.diff(mesh[:-1]) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -166,10 +163,10 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
             t = mesh[i]
             b_t = boundary[i] # b(t)
             eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = delta[i:]
+            u = eval_mesh-t
             b_tu = boundary[i+1:] # b(t+u) for all u
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo")
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -207,10 +204,9 @@ def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
     Returns:
     - boundary (np.array): Optimal stopping boundary for the times in mesh.
     """
-    N = len(mesh) # Number of temporal steps
+    N = len(mesh)-1 # Number of temporal steps
     c1 = (1 - gamma**2) # Constant 1
     boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-    delta = np.diff(mesh) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -220,11 +216,11 @@ def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
         for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
             t = mesh[i]
             b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:]  # Consider future times
-            u = delta[i:]
+            eval_mesh = mesh[i+1:-1]  # Consider future times
+            u = eval_mesh-t
             b_tu = boundary[i+1:] # b(t+u) for all u
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Abel")
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Abel")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -242,7 +238,7 @@ def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
         plt.ion()  # Modo interactivo
         fig, ax = plt.subplots()
         ax.clear()  # Limpiar el gráfico anterior
-        ax.plot(mesh, boundary, marker='o')
+        ax.plot(mesh, np.append(boundary, m/c1), marker='o')
         ax.set_xlabel("mesh")
         ax.set_ylabel("boundary")
         ax.set_title(f"Iteration {iter}")
@@ -255,7 +251,7 @@ def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
         # Update
         boundary = boundary_new
 
-    return boundary
+    return np.append(boundary, m/c1)
 
 
 ## Perspectiva Eduardo
@@ -273,12 +269,11 @@ def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000
     Returns:
     - boundary (np.array): Optimal stopping boundary for the times in mesh.
     """
-    N = len(mesh) # Number of temporal steps
+    N = len(mesh)-1 # Number of temporal steps
     c1 = (1 - gamma**2) # Constant 1
     c2 = 1 / c1  # Constant 2
     c3 = m * c2  # Constant 3
     boundary = np.full(N, c3)  # Initialize boundary with initial guess
-    delta = np.diff(mesh) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -288,11 +283,11 @@ def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000
         for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
             t = mesh[i]
             b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:]  # Consider future times
-            u = delta[i:]
+            eval_mesh = mesh[i+1:-1]  # Consider future times
+            u = eval_mesh-t
             b_tu = boundary[i+1:] # b(t+u) for all u
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo")
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo")
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -313,7 +308,7 @@ def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000
         plt.ion()  # Modo interactivo
         fig, ax = plt.subplots()
         ax.clear()  # Limpiar el gráfico anterior
-        ax.plot(mesh, boundary, marker='o')
+        ax.plot(mesh, np.append(boundary, m/c1), marker='o')
         ax.set_xlabel("mesh")
         ax.set_ylabel("boundary")
         ax.set_title(f"Iteration {iter}")
@@ -326,4 +321,4 @@ def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000
         # Update
         boundary = boundary_new
 
-    return boundary
+    return np.append(boundary, m/c1)
