@@ -247,7 +247,7 @@ def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
         ax.plot(mesh, boundary, marker='o')
         ax.set_xlabel("mesh")
         ax.set_ylabel("boundary")
-        ax.set_title(f"Iteración {iter}")
+        ax.set_title(f"Iteration {iter}")
         plt.draw()
         plt.pause(1)  # Esperar 1 segundo
         
@@ -318,7 +318,7 @@ def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000
         ax.plot(mesh, boundary, marker='o')
         ax.set_xlabel("mesh")
         ax.set_ylabel("boundary")
-        ax.set_title(f"Iteración {iter}")
+        ax.set_title(f"Iteration {iter}")
         plt.draw()
         plt.pause(1)  # Esperar 1 segundo
         
