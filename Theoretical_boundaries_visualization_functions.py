@@ -80,7 +80,7 @@ def f_t_sup(m, gamma, t, b_t, u, eval_mesh, b_tu, pers = "Eduardo"):
     norm_cdf_sup = norm.cdf((b_tu - means) / sigmas)
     norm_pdf_sup = norm.pdf((b_tu - means) / sigmas)
     
-    # f_
+    # f_t(u) for u that t+u is in eval_mesh
     f_sup = (1/(c2-eval_mesh))*(c3-(means * (1-norm_cdf_sup) + sigmas * norm_pdf_sup))
     
     return f_sup
@@ -101,10 +101,10 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
     Returns:
     - boundary (np.array): Optimal stopping boundary for the times in mesh.
     """
-    N = len(mesh) # Number of temporal steps
+    N = len(mesh)-1 # Number of temporal steps removing the last step
     c1 = (1 - gamma**2) # Constant 1
     boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-    delta = np.diff(mesh) # Array with the lenght of each step
+    delta = np.diff(mesh[:-1]) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -114,7 +114,7 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
         for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
             t = mesh[i]
             b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:]  # Consider future times
+            eval_mesh = mesh[i+1:-1]  # Consider future times
             u = delta[i:]
             b_tu = boundary[i+1:] # b(t+u) for all u
             
@@ -134,7 +134,7 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
             break
         boundary = boundary_new
 
-    return boundary
+    return np.append(boundary, m/c1)
 
 
 ## Perspectiva Eduardo
@@ -152,12 +152,10 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
     Returns:
     - boundary (np.array): Optimal stopping boundary for the times in mesh.
     """
-    N = len(mesh) # Number of temporal steps
+    N = len(mesh)-1 # Number of temporal steps removing the last step
     c1 = (1 - gamma**2) # Constant 1
-    c2 = 1 / c1  # Constant 2
-    c3 = m * c2  # Constant 3
-    boundary = np.full(N, c3)  # Initialize boundary with initial guess
-    delta = np.diff(mesh) # Array with the lenght of each step
+    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
+    delta = np.diff(mesh[:-1]) # Array with the lenght of each step
 
     h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
 
@@ -167,7 +165,7 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
         for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
             t = mesh[i]
             b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:]  # Consider future times
+            eval_mesh = mesh[i+1:-1]  # Consider future times
             u = delta[i:]
             b_tu = boundary[i+1:] # b(t+u) for all u
             
@@ -190,7 +188,7 @@ def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
           break
         boundary = boundary_new
 
-    return boundary
+    return np.append(boundary, m/c1)
 
 
 # Theoretical normal step by step
