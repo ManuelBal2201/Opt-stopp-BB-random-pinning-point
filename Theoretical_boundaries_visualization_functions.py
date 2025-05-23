@@ -72,8 +72,10 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
         mean = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-(t+u)*c1)) - c3)
         sigma = np.sqrt(u - (u**2)/(c2 - t))
     else:
-        mean = b_t + (u/(1-t))*(m-b_t)
-        sigma = np.sqrt((u/(1-t))**2*gamma**2+ (1-t-u)*u/(1-t))    
+        m_ty = (b_t*gamma**2+m*(1-t))/(t*gamma**2+1-t)
+        gamma_ty = np.sqrt((1-t)*gamma**2/(t*gamma**2+1-t))
+        mean = b_t + (u/(1-t))*(m_ty-b_t)
+        sigma = np.sqrt((u/(1-t))**2*gamma_ty**2+ (1-t-u)*u/(1-t))    
     
     # Normal distribution functions
     norm_cdf_sup = norm.cdf((b_tu - mean) / sigma)

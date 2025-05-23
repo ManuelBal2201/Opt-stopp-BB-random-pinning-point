@@ -124,7 +124,7 @@ def value_function_first_step(X_vals, M, dt, h_function):
   Expectance_V_next = np.mean(Z_next, axis=1) # Obtain the expenctance of v in the next step.
   v = np.maximum(X_vals, Expectance_V_next) # Dynamic principle.
 
-  # Value function in t = 1-dt.
+  # Value function in t = 1-dt. CASO DEGENERADO
   r = 0
   v[:np.argmax(v == X_vals)] = r # The value function for the points in the C region are the pinning point.
 

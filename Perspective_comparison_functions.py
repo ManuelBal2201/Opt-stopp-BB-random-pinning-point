@@ -37,3 +37,4 @@ def simulate_brownian_bridge(t, z_t, T, z_T, u=None, n_steps=1000):
         current_x = next_x
 
       return all_times, np.array(path)
+  
