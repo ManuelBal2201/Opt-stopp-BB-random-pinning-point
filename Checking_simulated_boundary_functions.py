@@ -1,26 +1,25 @@
 # Libraries
 import numpy as np
-from scipy.stats import rv_discrete, rv_continuous, norm
+from scipy.stats import rv_discrete, rv_continuous
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
-import random
 
 
 # h definition
 def h_definition(pdf, support, is_discrete = False, x_vals = None, probs = None):
   """
 
-  Define the function given in (2.3). REVISAR SI EL INDICE ES CORRECTO EN EL DEFINITIVO
+  Define the function given in Equation 2.7. REVISAR SI EL INDICE ES CORRECTO EN EL DEFINITIVO
 
   Parameters:
   - pdf (function):  Probability density function of X if it is continuous.
   - support (list): Support of X if it is continuous. The first element is the lower bound an d the second is the upper bound.
   - is_discrete (bool): Indicates if X is discrete.
-  - x_vals (array): Support of X if it is discrete.
-  - probs (array): Probabilities of x_vals if X is discrete.
+  - x_vals (np.array): Support of X if it is discrete.
+  - probs (np.array): Probabilities of x_vals if X is discrete.
 
   Return:
-  - h (función): Function h for the particular pdf or pmf.
+  - h (function): Function h for the particular pdf or pmf.
 
   """
 
@@ -39,7 +38,7 @@ def h_definition(pdf, support, is_discrete = False, x_vals = None, probs = None)
 
 
 # Spatial grid definition
-def spatial_grid(mu, L = 100):
+def spatial_grid(mu, h, L = 100):
   """
 
   Spatial grid that it is used as initial values to simulate the process.
@@ -48,10 +47,11 @@ def spatial_grid(mu, L = 100):
   - mu: It is the distribution of X.
     - If X is discrete, is rv_discrete.
     - If X is continuous, is rv_continuous.
+  - h (function): Function h for the particular pdf of mu.
   - L (int): Number of points on the spatial grid. It is needed that L>5.
 
   Return:
-  - X_vals: X values we are considering.
+  - X_vals (np.array): X values we are considering.
 
   """
 
@@ -62,17 +62,45 @@ def spatial_grid(mu, L = 100):
   else:  # If X is continuos.
     (a, b) = mu.support() # Extract the support interval.
     if np.isinf(a) and not np.isinf(b): # If it is not bounded below.
-      X_vals_unsorted = np.append(mu.rvs(size = L-5), np.linspace(b, b + 0.839924, 5)) # Generate randomly L-5 values following a mu pdf and a grid of 5 points between b and b+beta.
-      X_vals = np.sort(X_vals_unsorted) # Sort the values.
+      X_vals_random = mu.rvs(size = L*0.97) # Generate randomly L*0.97 values following a mu pdf.
+      if (max(X_vals_random)-min(X_vals_random) < 0.839924): # The distance between the maximum and minimum is very low.
+          mean = mu.mean()
+          a = mean
+          b = mean
+          std = mu.std()
+          while True: # Loop until obtaining an interval where h changes sign.
+              a = a - std - 1 # Substract 1 to improve pacing for low standard deviations.
+              x_vals = np.linspace(a, b + 0.839924, 1000)
+              h_vals = [h(x) for x in x_vals]
+              sign_changes = np.where(np.diff(np.sign(h_vals)))[0]
+              if sign_changes.size > 0:
+                  break
+          X_vals = np.linspace(a, b + 0.839924, L)
+      else:
+          X_vals_eq = np.linspace(b, b + 0.839924, L*0.03) # Generate L*0.03 equidistant points between b and b+beta.
+          X_vals = np.sort(np.append(X_vals_random, X_vals_eq)) # Sort the values.
 
     elif np.isinf(b): # If it is unbounded or not bounded above.
-      X_vals = np.sort(mu.rvs(size = L)) # Sort the values.
+      X_vals_random = mu.rvs(size = L) # Generate randomly L*0.97 values following a mu pdf.
+      if (max(X_vals_random)-min(X_vals_random) < 0.839924): # The distance between the maximum and minimum is very low.
+          mean = mu.mean()
+          a = mean
+          b = mean
+          std = mu.std()
+          while True: # Loop until obtaining an interval where h changes sign.
+              a = a - std - 1 # Substract 1 to improve pacing for low standard deviations.
+              b = b + std + 1 # Add 1 to improve pacing for low standard deviations.
+              x_vals = np.linspace(a, b, 1000)
+              h_vals = [h(x) for x in x_vals]
+              sign_changes = np.where(np.diff(np.sign(h_vals)))[0]
+              if sign_changes.size > 0:
+                  break
+          X_vals = np.linspace(a, b, L)
+      else:
+          X_vals = np.sort(X_vals_random) # Sort the values.
 
     else: # If it is bounded.
       X_vals = np.linspace(a, b + 0.839924, L)  # Spatial grid.
-      # CAMBIARLO POR GENERAR ACORDE A LA DENSIDAD?
-      #X_vals_unsorted = np.append(mu.rvs(size = L-5), np.linspace(b, b + 0.839924, 5)) # Generate randomly L-5 values following a mu pdf and a grid of 5 points between b and b+beta.
-      #X_vals = np.sort(X_vals_unsorted) # Sort the values.
 
   return X_vals
 
@@ -91,7 +119,7 @@ def simulate_process(z, M, t, dt, h):
   - h (function): h function that appears in the Z_{t + \Delta t} definition.
 
   Return:
-  - paths: M possible paths of the process.
+  - paths (np.array): M possible paths of the process.
 
   """
 
@@ -104,12 +132,15 @@ def simulate_process(z, M, t, dt, h):
 
 
 # First step value function (backwards loop)
-def value_function_first_step(X_vals, M, dt, h_function):
+def value_function_first_step(mu, X_vals, M, dt, h_function):
   """
 
   Value function in t = 1-dt.
 
   Parameters:
+  - mu: It is the distribution of X.
+    - If X is discrete, is rv_discrete.
+    - If X is continuous, is rv_continuous.
   - X_vals: Spatial grid we are considering.
   - M (int): Number of Monte Carlo simulations.
   - dt (float): Temporal step length.
@@ -120,13 +151,24 @@ def value_function_first_step(X_vals, M, dt, h_function):
 
   """
 
-  Z_next = np.array([simulate_process(x_val, M, 1-dt, dt, h_function) for x_val in X_vals]) # Obtain Z values for the next step.
-  Expectance_V_next = np.mean(Z_next, axis=1) # Obtain the expenctance of v in the next step.
-  v = np.maximum(X_vals, Expectance_V_next) # Dynamic principle.
-
-  # Value function in t = 1-dt. CASO DEGENERADO
-  r = 0
-  v[:np.argmax(v == X_vals)] = r # The value function for the points in the C region are the pinning point.
+  # Value function in t = 1-dt.
+  if isinstance(mu, rv_discrete):  # If X is discrete.
+      x_vals = mu.xk # mu support.
+      
+      if len(x_vals) == 1: # Dirac's delta case
+          Z_next = np.array([simulate_process(x_val, M, 1-dt, dt, h_function) for x_val in X_vals]) # Obtain Z values for the next step.
+          Expectance_V_next = np.mean(Z_next, axis=1) # Obtain the expenctance of v in the next step.
+          v = np.maximum(X_vals, Expectance_V_next) # Dynamic principle.
+          
+          v[:np.argmax(v == X_vals)] = x_vals
+      
+      else:
+          interp_func = interp1d(x_vals, x_vals, kind='linear', fill_value="extrapolate")
+          v = interp_func(X_vals)
+          
+  
+  else:  # If X is continuos.
+      v = X_vals
 
   return v
 
@@ -150,7 +192,7 @@ def v_expectance(X_vals, M, t, dt, h_function, v):
 
   """
   # Create an interpolator function.
-  interp_func = interp1d(X_vals, v, kind='linear', fill_value="extrapolate")  # You can use 'linear', 'quadratic', 'cubic', etc.
+  interp_func = interp1d(X_vals, v, kind='linear', fill_value="extrapolate")
 
   # Initialize E[V(t+s, Z_{t+s}) | Z_t = X_vals].
   v_expec = np.zeros(len(X_vals)) # Initialize the numpy array E[V(t+s, Z_{t+s}) | Z_t = X_vals].
@@ -188,20 +230,21 @@ def optimal_stopping_montecarlo(mu = rv_discrete(name = 'Delta Dirac', values = 
 
   # Generation of the initial mesh for t = 1.
   if isinstance(mu, rv_discrete):  # If X is discrete.
-    X_vals = spatial_grid(mu = mu, L = L) # Values of X that it is considered as initial values.
     h_function = h_definition(pdf = None, support = None, is_discrete = True, x_vals = mu.xk, probs = mu.pk) # Define the h(t, x) function.
-
+    X_vals = spatial_grid(mu = mu, h = h_function, L = L) # Values of X that it is considered as initial values.
+    
   elif isinstance(mu, rv_continuous):  # If X is continuous.
-    X_vals = spatial_grid(mu = mu, L = L) # Values of X that it is considered as initial values.
-    h_function = h_definition(pdf = mu.pdf, support = mu.support()) # Define the h(t, x) function.
+    #h_function = h_definition(pdf = mu.pdf, support = mu.support()) # Define the h(t, x) function.
+    h_function = lambda t, z: (z*gamma**2 + m*(1-t))/(1-t*(1-gamma**2)) # BORRAR
+    X_vals = spatial_grid(mu = mu, h = h_function, L = L) # Values of X that it is considered as initial values.
 
   else:
     raise ValueError("mu must be a rv_discrete or rv_continuous variable.")
-  h_function = lambda t, z: (z*gamma**2 + m*(1-t))/(1-t*(1-gamma**2)) # BORRAR
+  
 
   value_function = np.zeros((N, L))  # Initialize the array where the boundary points are saved.
 
-  value_function[N-1, :] = value_function_first_step(X_vals, M, dt, h_function) # Value function in t = 1-dt.
+  value_function[N-1, :] = value_function_first_step(mu, X_vals, M, dt, h_function) # Value function in t = 1-dt.
 
   # Boundary obtention
   for j in range(2, N): # Loop for Z_{t + \Delta t}.
