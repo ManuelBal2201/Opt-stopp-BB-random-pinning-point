@@ -68,7 +68,7 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu):
     norm_cdf_sup = norm.cdf((b_tu - mean) / sigma)
     norm_pdf_sup = norm.pdf((b_tu - mean) / sigma)
     
-    # f_t(u) for u that t+u is in eval_mesh
+    # f_t(u)
     f_sup = (1/(c2-t-u))*(c3-(mean * (1-norm_cdf_sup) + sigma * norm_pdf_sup))
     
     return f_sup
@@ -89,36 +89,36 @@ def optimal_stopping_Normal(mesh, m, gamma, tol=1e-3, max_iter=1000):
     Returns:
     - boundary (np.array): Optimal stopping boundary for the times in mesh.
     """
-    N = len(mesh)-1 # Number of temporal steps removing the last step
-    c1 = (1 - gamma**2) # Constant 1
-    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
+    N = len(mesh)-1 # Number of temporal steps removing the last step.
+    c1 = (1 - gamma**2) # Constant 1.
+    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess.
 
-    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
+    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1) # h definition for this particular case.
 
     for iter in range(max_iter):
-        boundary_new = boundary.copy()
+        boundary_new = boundary.copy() # Initialize the boundary as first one.
 
-        for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
-            t = mesh[i]
-            b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = eval_mesh-t
-            b_tu = boundary[i+1:] # b(t+u) for all u
+        for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh.
+            t = mesh[i] # Actual time.
+            b_t = boundary[i] # b(t).
+            eval_mesh = mesh[i+1:-1]  # Consider future times.
+            u = eval_mesh-t # Step size from t to eval_mesh.
+            b_tu = boundary[i+1:] # b(t+u) for all u.
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu)
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu) # f_t(u) for all u.
 
-            # Compute integral using Trapezoidal rule
+            # Compute integral using Trapezoidal rule.
             integral = np.trapz(f_sup, eval_mesh)
 
-            # Update boundary estimate
+            # Update boundary estimate.
             boundary_new[i] = h_normal(t, b_t) - integral
 
-        # Compute error and check for convergence
+        # Compute error and check for convergence.
         e = compute_error(boundary_new, boundary)
         if iter % 100 == 0:
             print(iter, e)
         if e < tol:
             break
-        boundary = boundary_new
+        boundary = boundary_new # Update boundary for the next iteration.
 
-    return np.append(boundary, m/c1)
+    return np.append(boundary, m/c1) # Add b(1).

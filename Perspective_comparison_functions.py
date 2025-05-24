@@ -23,8 +23,9 @@ def simulate_brownian_bridge(t, z_t, T, z_T, u=None, n_steps=1000):
     """
     
     assert 0 <= t < T, "t must be in [0, T)"
-    if u is not None:
+    if u is not None: # Return the next value of the BB at time t+u.
       assert t < t+u <= T, "t + u must be in (t, T]"
+      # Brownian bridge step.
       mean = z_t + u*(z_T - z_t)/(T - t)
       var = u * (T - t - u) / (T - t)
       std = np.sqrt(var)
@@ -32,21 +33,25 @@ def simulate_brownian_bridge(t, z_t, T, z_T, u=None, n_steps=1000):
 
       return next_x
 
-    else:
-      all_times = np.linspace(t, T, n_steps)
-
+    else: # Return the full simulated BB path.
+      all_times = np.linspace(t, T, n_steps) # Temporal grid.
+      
+      # Initialize variables
       path = [z_t]
       current_t = t
       current_x = z_t
 
-      for next_t in all_times[1:]:
-        u = next_t - current_t
+      for next_t in all_times[1:]: # Loop for each step.
+        u = next_t - current_t # Temporal step size.
+        
+        # Brownian bridge step.
         mean = current_x + u*(z_T - current_x)/(T-current_t)
         var = u * (T - current_t -u) / (T - current_t)
         std = np.sqrt(var)
         next_x = np.random.normal(mean, std)
-        path.append(next_x)
-
+        path.append(next_x) # Add the obtained point at the end of the path.
+        
+        # Update time and space for the next iteration.
         current_t = next_t
         current_x = next_x
 
