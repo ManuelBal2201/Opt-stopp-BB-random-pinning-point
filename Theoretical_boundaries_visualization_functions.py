@@ -1,12 +1,6 @@
 # Libraries
 import numpy as np
-from scipy.stats import rv_discrete, rv_continuous, norm
-from scipy.integrate import quad
-from scipy.interpolate import interp1d
-import random
-
-## Visualization
-import matplotlib.pyplot as plt
+from scipy.stats import norm
 
 
 # Boundary function for Brownian bridge
@@ -46,7 +40,7 @@ def compute_error(boundary_new, boundary):
 
 
 ## f_t evaluated in the upper limits of the integrals
-def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
+def f_t_sup(m, gamma, t, b_t, u, b_tu):
     """
     f_t evaluated in the upper limits of the integrals.
     
@@ -57,7 +51,6 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
     - b_t (float): Actual value of the boundary.
     - u (float): Step that it is considered.
     - b_tu (float): Boundary value for eval_mesh times.
-    - pers (string): Perspective chosen. Eduardo or Abel
     
     Returns:
     - f_sup (np.array): f_t evaluated in the upper limits of the integrals.
@@ -68,14 +61,8 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
     c3 = m * c2  # Constant 3
             
     # Mean and standard deviation
-    if (pers == "Abel"):
-        mean = (1-(u/(c2-t)))*(b_t + (m*(1-t*c1))/(c1*(1-(t+u)*c1)) - c3)
-        sigma = np.sqrt(u - (u**2)/(c2 - t))
-    else:
-        m_ty = (b_t*gamma**2+m*(1-t))/(t*gamma**2+1-t)
-        gamma_ty = np.sqrt((1-t)*gamma**2/(t*gamma**2+1-t))
-        mean = b_t + (u/(1-t))*(m_ty-b_t)
-        sigma = np.sqrt((u/(1-t))**2*gamma_ty**2+ (1-t-u)*u/(1-t))    
+    mean = b_t + u/(1 - t*c1)*(m - b_t*c1)
+    sigma = np.sqrt(u - c1*u**2/(1 - t*c1))
     
     # Normal distribution functions
     norm_cdf_sup = norm.cdf((b_tu - mean) / sigma)
@@ -87,8 +74,8 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo"):
     return f_sup
 
 
-## Perspectiva Abel
-def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
+## Optimal stopping boundary
+def optimal_stopping_Normal(mesh, m, gamma, tol=1e-3, max_iter=1000):
     """
     Compute the optimal stopping boundary using a fixed-point Picard iteration.
 
@@ -118,7 +105,7 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
             u = eval_mesh-t
             b_tu = boundary[i+1:] # b(t+u) for all u
             
-            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Abel")
+            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu)
 
             # Compute integral using Trapezoidal rule
             integral = np.trapz(f_sup, eval_mesh)
@@ -132,195 +119,6 @@ def normal_boundary_ABEL(mesh, m, gamma, tol=1e-3, max_iter=1000):
             print(iter, e)
         if e < tol:
             break
-        boundary = boundary_new
-
-    return np.append(boundary, m/c1)
-
-
-## Perspectiva Eduardo
-def normal_boundary_EDUARDO(mesh, m, gamma, tol=1e-3, max_iter=1000):
-    """
-    Compute the optimal stopping boundary using a fixed-point Picard iteration.
-
-    Parameters:
-    - mesh (np.array): Temporal grid of [0,1].
-    - m (float): Mean of the distribution.
-    - gamma (float): Standard deviation of the distribution.
-    - tol (float): Tolerance for the fixed point algorithm.
-    - max_iter (int): Maximum number of iterations to prevent infinite loops.
-
-    Returns:
-    - boundary (np.array): Optimal stopping boundary for the times in mesh.
-    """
-    N = len(mesh)-1 # Number of temporal steps removing the last step
-    c1 = (1 - gamma**2) # Constant 1
-    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-
-    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
-
-    for iter in range(max_iter):
-        boundary_new = boundary.copy()
-
-        for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
-            t = mesh[i]
-            b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = eval_mesh-t
-            b_tu = boundary[i+1:] # b(t+u) for all u
-            
-            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo")
-
-            # Compute integral using Trapezoidal rule
-            integral = np.trapz(f_sup, eval_mesh)
-
-            # Update boundary estimate
-            boundary_new[i] = h_normal(t, b_t) - integral
-
-        # Compute error and check for convergence
-        e = compute_error(boundary_new, boundary)
-        if iter % 100 == 0:
-            print(iter, e)
-        if e < tol:
-            break
-        if np.isnan(e):
-          print(f"Break at {iter} iteration because the error is {e}")
-          break
-        boundary = boundary_new
-
-    return np.append(boundary, m/c1)
-
-
-# Theoretical normal step by step
-## Perspectiva Abel
-def normal_boundary_ABEL_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
-    """
-    Compute the optimal stopping boundary using a fixed-point Picard iteration.
-
-    Parameters:
-    - mesh (np.array): Temporal grid of [0,1].
-    - m (float): Mean of the distribution.
-    - gamma (float): Standard deviation of the distribution.
-    - tol (float): Tolerance for the fixed point algorithm.
-    - max_iter (int): Maximum number of iterations to prevent infinite loops.
-
-    Returns:
-    - boundary (np.array): Optimal stopping boundary for the times in mesh.
-    """
-    N = len(mesh)-1 # Number of temporal steps
-    c1 = (1 - gamma**2) # Constant 1
-    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess
-
-    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
-
-    for iter in range(max_iter):
-        boundary_new = boundary.copy()
-
-        for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
-            t = mesh[i]
-            b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = eval_mesh-t
-            b_tu = boundary[i+1:] # b(t+u) for all u
-            
-            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Abel")
-
-            # Compute integral using Trapezoidal rule
-            integral = np.trapz(f_sup, eval_mesh)
-
-            # Update boundary estimate
-            boundary_new[i] = h_normal(t, b_t) - integral
-
-        # Compute error and check for convergence
-        e = compute_error(boundary_new, boundary)
-        if iter % 100 == 0:
-            print(iter, e)
-        if e < tol:
-            break
-        # Visualization
-        plt.ion()  # Modo interactivo
-        fig, ax = plt.subplots()
-        ax.clear()  # Limpiar el gráfico anterior
-        ax.plot(mesh, np.append(boundary, m/c1), marker='o')
-        ax.set_xlabel("mesh")
-        ax.set_ylabel("boundary")
-        ax.set_title(f"Iteration {iter}")
-        plt.draw()
-        plt.pause(1)  # Esperar 1 segundo
-        
-        plt.ioff()
-        plt.show()
-        
-        # Update
-        boundary = boundary_new
-
-    return np.append(boundary, m/c1)
-
-
-## Perspectiva Eduardo
-def normal_boundary_EDUARDO_step_by_step(mesh, m, gamma, tol=1e-3, max_iter=1000):
-    """
-    Compute the optimal stopping boundary using a fixed-point Picard iteration.
-
-    Parameters:
-    - mesh (np.array): Temporal grid of [0,1].
-    - m (float): Mean of the distribution.
-    - gamma (float): Standard deviation of the distribution.
-    - tol (float): Tolerance for the fixed point algorithm.
-    - max_iter (int): Maximum number of iterations to prevent infinite loops.
-
-    Returns:
-    - boundary (np.array): Optimal stopping boundary for the times in mesh.
-    """
-    N = len(mesh)-1 # Number of temporal steps
-    c1 = (1 - gamma**2) # Constant 1
-    c2 = 1 / c1  # Constant 2
-    c3 = m * c2  # Constant 3
-    boundary = np.full(N, c3)  # Initialize boundary with initial guess
-
-    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1)
-
-    for iter in range(max_iter):
-        boundary_new = boundary.copy()
-
-        for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh
-            t = mesh[i]
-            b_t = boundary[i] # b(t)
-            eval_mesh = mesh[i+1:-1]  # Consider future times
-            u = eval_mesh-t
-            b_tu = boundary[i+1:] # b(t+u) for all u
-            
-            f_sup = f_t_sup(m, gamma, t, b_t, u, b_tu, pers = "Eduardo")
-
-            # Compute integral using Trapezoidal rule
-            integral = np.trapz(f_sup, eval_mesh)
-
-            # Update boundary estimate
-            boundary_new[i] = h_normal(t, b_t) - integral
-
-        # Compute error and check for convergence
-        e = compute_error(boundary_new, boundary)
-        if iter % 100 == 0:
-            print(iter, e)
-        if e < tol:
-            break
-        if np.isnan(e):
-          print(f"Break at {iter} iteration because the error is {e}")
-          break
-        # Visualization
-        plt.ion()  # Modo interactivo
-        fig, ax = plt.subplots()
-        ax.clear()  # Limpiar el gráfico anterior
-        ax.plot(mesh, np.append(boundary, m/c1), marker='o')
-        ax.set_xlabel("mesh")
-        ax.set_ylabel("boundary")
-        ax.set_title(f"Iteration {iter}")
-        plt.draw()
-        plt.pause(1)  # Esperar 1 segundo
-        
-        plt.ioff()
-        plt.show()
-        
-        # Update
         boundary = boundary_new
 
     return np.append(boundary, m/c1)
