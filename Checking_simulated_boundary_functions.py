@@ -71,7 +71,7 @@ def spatial_grid(mu, h, L = 100):
           while True: # Loop until obtaining an interval where h changes sign.
               a = a - std - 1 # Substract 1 to improve pacing for low standard deviations.
               x_vals = np.linspace(a, b + 0.839924, 1000)
-              h_vals = [h(x) for x in x_vals]
+              h_vals = [h(1,x) for x in x_vals]
               sign_changes = np.where(np.diff(np.sign(h_vals)))[0]
               if sign_changes.size > 0:
                   break
@@ -91,7 +91,7 @@ def spatial_grid(mu, h, L = 100):
               a = a - std - 1 # Substract 1 to improve pacing for low standard deviations.
               b = b + std + 1 # Add 1 to improve pacing for low standard deviations.
               x_vals = np.linspace(a, b, 1000)
-              h_vals = [h(x) for x in x_vals]
+              h_vals = [h(1,x) for x in x_vals]
               sign_changes = np.where(np.diff(np.sign(h_vals)))[0]
               if sign_changes.size > 0:
                   break
@@ -107,7 +107,7 @@ def spatial_grid(mu, h, L = 100):
 
 # Process simulation
 def simulate_process(z, M, t, dt, h):
-  """
+  r"""
 
   Simulation of Z_{t + \Delta t} using Euler-Maruyama estimation.
 
@@ -133,7 +133,7 @@ def simulate_process(z, M, t, dt, h):
 
 # First step value function (backwards loop)
 def value_function_first_step(mu, X_vals, M, dt, h_function):
-  """
+  r"""
 
   Value function in t = 1-dt.
 
@@ -151,7 +151,6 @@ def value_function_first_step(mu, X_vals, M, dt, h_function):
 
   """
 
-  # Value function in t = 1-dt.
   if isinstance(mu, rv_discrete):  # If X is discrete.
       x_vals = mu.xk # mu support.
       
@@ -175,7 +174,7 @@ def value_function_first_step(mu, X_vals, M, dt, h_function):
 
 # Value function expectance
 def v_expectance(X_vals, M, t, dt, h_function, v):
-  """
+  r"""
 
   E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals.
 
