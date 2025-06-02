@@ -1,11 +1,9 @@
 # Libraries
 import numpy as np
-from concurrent.futures import ProcessPoolExecutor
-from functools import partial
 from scipy.interpolate import interp1d
 
 # Process simulation
-def simulate_brownian_bridge_2(t, z_t, T, z_T, u):
+def simulate_brownian_bridge_1(t, z_t, T, z_T, u):
     r"""
 
     Simulates a Brownian bridge process between two fixed points.
@@ -30,7 +28,7 @@ def simulate_brownian_bridge_2(t, z_t, T, z_T, u):
   
     return next_x
 
-def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
+def mu_ty_simulator_1(mu, weights, parameters, y, M, t):
     r"""
     
     Generate samples of \mu_{t,y}.
@@ -98,7 +96,7 @@ def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
 
 # Value function expectance
 ## Define function to run in parallel
-def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
+def compute_v_expec_1(mu, weights, parameters, x_val, M, t, u, interp_func):
     r"""
     
     Compute E[V(t+s, Z_{t+s}) | Z_t = x_val].
@@ -122,10 +120,10 @@ def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
     
     """
     # Generate random points where the process may end
-    mu_ty_points = mu_ty_simulator_2(mu = mu, weights = weights, parameters = parameters, y = x_val, M = M, t = t)
+    mu_ty_points = mu_ty_simulator_1(mu = mu, weights = weights, parameters = parameters, y = x_val, M = M, t = t)
     
     # Simulate a brownian bridge that ends in the mu_tz_points. Keep only the value on t+u
-    Z_tu = simulate_brownian_bridge_2(t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
+    Z_tu = simulate_brownian_bridge_1(t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
     
     # Obtaining the value function for the obtained points
     v_new = interp_func(Z_tu)
@@ -135,40 +133,8 @@ def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
     
     return v_expec 
 
-## Wrapper function to parallelize
-def parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func):
-    r"""
-    
-    Wrapper function to parallelize.
-    
-    Parameters:
-    - mu (string): Type of mixture considered
-        - If X is discrete, is "discrete".
-        - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
-    - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
-        - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - x_val: Point of spatial grid that considered.
-    - M (int): Number of Monte Carlo simulations.
-    - t (float): Value of t (temporal variable).
-    - u (float): Temporal step length.
-    - v (np.array): Value function in t+dt. The i-th element is the value function in the i-th point of X_vals.
-    
-    Return:
-    - v_expec (np.array): E[V(t+s, Z_{t+s}) | Z_t = x_val].
-    
-    """
-    v_expec = np.zeros(len(X_vals))
-    with ProcessPoolExecutor() as executor:
-        # Use partial to freeze all parameters except x_val
-        func = partial(compute_v_expec_2, mu, weights, parameters, M=M, t=t, u=u, interp_func=interp_func)
-        results = executor.map(func, X_vals)
-    v_expec[:] = list(results)
-    return v_expec
-
 ## Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals
-def v_expectance_2(mu, weights, parameters, X_vals, M, t, u, v):
+def v_expectance_1(mu, weights, parameters, X_vals, M, t, u, v):
     r"""
     
     Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals.
@@ -199,12 +165,13 @@ def v_expectance_2(mu, weights, parameters, X_vals, M, t, u, v):
     v_expec = np.zeros(len(X_vals))
     
     # Expected value function
-    v_expec = parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func)
+    for i, x_val in enumerate(X_vals):
+        v_expec[i] = compute_v_expec_1(mu = mu, weights = weights, parameters = parameters, x_val = x_val, M=M, t=t, u=u, interp_func=interp_func)
     
     return v_expec
 
 # Optimal stopping boundary simulation
-def optimal_stopping_montecarlo_2(mu = "continuous", weights = np.array([1]), parameters = np.array([[0],[1]]), N = 100, a = -1, b = 1, L = 100, M = 5000, alpha = 1):
+def optimal_stopping_montecarlo_1(mu = "continuous", weights = np.array([1]), parameters = np.array([[0],[1]]), N = 100, a = -1, b = 1, L = 100, M = 5000, alpha = 1):
     """
     
     Implementation for the optimal stopping boundary with Monte Carlo.
@@ -244,7 +211,7 @@ def optimal_stopping_montecarlo_2(mu = "continuous", weights = np.array([1]), pa
         t = t_mesh[j-1] # Time of the step
         M_t = int(M * (1 + alpha * (1 - t)))
         
-        Expectance_V_next = v_expectance_2(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :]) # Compute the value function expectance
+        Expectance_V_next = v_expectance_1(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :])
         value_function[j-1, :] = np.maximum(X_vals, Expectance_V_next) # Dynamic Principle
     
     return value_function, X_vals

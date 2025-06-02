@@ -5,7 +5,7 @@ from functools import partial
 from scipy.interpolate import interp1d
 
 # Process simulation
-def simulate_brownian_bridge_2(t, z_t, T, z_T, u):
+def simulate_brownian_bridge_3(t, z_t, T, z_T, u):
     r"""
 
     Simulates a Brownian bridge process between two fixed points.
@@ -22,15 +22,30 @@ def simulate_brownian_bridge_2(t, z_t, T, z_T, u):
 
     """
     
-    # Brownian bridge step.
-    mean = z_t + u*(z_T - z_t)/(T - t)
-    var = u * (T - (t + u)) / (T - t)
-    std = np.sqrt(var)
-    next_x = np.random.normal(loc = mean, scale = std)
+    # Initialize output array
+    next_x = np.zeros_like(z_T)
+    
+    # Obtain unique z_T values
+    unique_z_T = np.unique(z_T)
+    
+    for val in unique_z_T:
+        # Find indices where z_T == val
+        idx = np.where(z_T == val)[0]
+        
+        # Subset z_t for those indices
+        z_T_val = val
+        
+        # Brownian bridge step
+        mean = z_t + u * (z_T_val - z_t) / (T - t)
+        var = u * (T - (t + u)) / (T - t)
+        std = np.sqrt(var)
+        
+        # Sample for all matching indices
+        next_x[idx] = np.random.normal(loc=mean, scale=std)
   
     return next_x
 
-def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
+def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
     r"""
     
     Generate samples of \mu_{t,y}.
@@ -98,7 +113,7 @@ def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
 
 # Value function expectance
 ## Define function to run in parallel
-def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
+def compute_v_expec_3(mu, weights, parameters, x_val, M, t, u, interp_func):
     r"""
     
     Compute E[V(t+s, Z_{t+s}) | Z_t = x_val].
@@ -122,10 +137,10 @@ def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
     
     """
     # Generate random points where the process may end
-    mu_ty_points = mu_ty_simulator_2(mu = mu, weights = weights, parameters = parameters, y = x_val, M = M, t = t)
+    mu_ty_points = mu_ty_simulator_3(mu = mu, weights = weights, parameters = parameters, y = x_val, M = M, t = t)
     
     # Simulate a brownian bridge that ends in the mu_tz_points. Keep only the value on t+u
-    Z_tu = simulate_brownian_bridge_2(t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
+    Z_tu = simulate_brownian_bridge_3(t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
     
     # Obtaining the value function for the obtained points
     v_new = interp_func(Z_tu)
@@ -136,7 +151,7 @@ def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
     return v_expec 
 
 ## Wrapper function to parallelize
-def parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func):
+def parallel_loop_3(mu, weights, parameters, X_vals, M, t, u, interp_func):
     r"""
     
     Wrapper function to parallelize.
@@ -162,13 +177,13 @@ def parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func):
     v_expec = np.zeros(len(X_vals))
     with ProcessPoolExecutor() as executor:
         # Use partial to freeze all parameters except x_val
-        func = partial(compute_v_expec_2, mu, weights, parameters, M=M, t=t, u=u, interp_func=interp_func)
+        func = partial(compute_v_expec_3, mu, weights, parameters, M=M, t=t, u=u, interp_func=interp_func)
         results = executor.map(func, X_vals)
     v_expec[:] = list(results)
     return v_expec
 
 ## Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals
-def v_expectance_2(mu, weights, parameters, X_vals, M, t, u, v):
+def v_expectance_3(mu, weights, parameters, X_vals, M, t, u, v):
     r"""
     
     Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals.
@@ -199,12 +214,12 @@ def v_expectance_2(mu, weights, parameters, X_vals, M, t, u, v):
     v_expec = np.zeros(len(X_vals))
     
     # Expected value function
-    v_expec = parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func)
+    v_expec = parallel_loop_3(mu, weights, parameters, X_vals, M, t, u, interp_func)
     
     return v_expec
 
 # Optimal stopping boundary simulation
-def optimal_stopping_montecarlo_2(mu = "continuous", weights = np.array([1]), parameters = np.array([[0],[1]]), N = 100, a = -1, b = 1, L = 100, M = 5000, alpha = 1):
+def optimal_stopping_montecarlo_3(mu = "continuous", weights = np.array([1]), parameters = np.array([[0],[1]]), N = 100, a = -1, b = 1, L = 100, M = 5000, alpha = 1):
     """
     
     Implementation for the optimal stopping boundary with Monte Carlo.
@@ -244,7 +259,7 @@ def optimal_stopping_montecarlo_2(mu = "continuous", weights = np.array([1]), pa
         t = t_mesh[j-1] # Time of the step
         M_t = int(M * (1 + alpha * (1 - t)))
         
-        Expectance_V_next = v_expectance_2(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :]) # Compute the value function expectance
+        Expectance_V_next = v_expectance_3(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :]) # Compute the value function expectance
         value_function[j-1, :] = np.maximum(X_vals, Expectance_V_next) # Dynamic Principle
     
     return value_function, X_vals
