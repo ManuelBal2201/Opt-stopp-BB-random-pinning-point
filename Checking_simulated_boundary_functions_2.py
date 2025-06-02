@@ -68,7 +68,7 @@ def mu_ty_simulator(mu, weights, parameters, y, M, t):
     elif mu == "continuous":
         # Initialize variables
         m = parameters[0]
-        gamma2 = parameters[1]
+        gamma2 = parameters[1]**2 # Square the standar deviation (2nd dimension of the parameters array)
         
         # Update parameters and weights to t,z
         A = t/(2*(1 - t)) + 1/(2*gamma2)
