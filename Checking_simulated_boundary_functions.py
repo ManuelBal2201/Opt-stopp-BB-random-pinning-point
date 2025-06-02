@@ -106,7 +106,7 @@ def spatial_grid(mu, h, L = 100):
 
 
 # Process simulation
-def simulate_process1(z, M, t, dt, h):
+def simulate_process(z, M, t, dt, h):
   r"""
 
   Simulation of Z_{t + \Delta t} using Euler-Maruyama estimation.
@@ -129,60 +129,6 @@ def simulate_process1(z, M, t, dt, h):
   paths = z + np.multiply(drift, dt) + dW # Array where the i-th element is value of Z_{t + \Delta t} for the i-th Monte Carlo iteration.
 
   return paths
-
-def simulate_brownian_bridge(t, z_t, T, z_T, u):
-    r"""
-
-    Simulates a Brownian bridge process between two fixed points.
-
-    Parameters:
-    - t (float): Starting time of the process. Must satisfy 0 <= t < T.
-    - z_t (float): Position of the process at time t.
-    - T (float): Ending time of the process.
-    - z_T (float): Position of the process at time T.
-    - u (float): If provided, the step size for the point of interest. Must satisfy t + u <= T.
-
-    Returns:
-    - next_x (float): If `u` is provided, returns the next value of the Brownian bridge at time t + u.
-
-    """
-    
-    assert 0 <= t < T, "t must be in [0, T)"
-    assert t < t+u <= T, "t + u must be in (t, T]"
-    
-    # Brownian bridge step.
-    mean = z_t + u*(z_T - z_t)/(T - t)
-    var = u * (T - t - u) / (T - t)
-    std = np.sqrt(var)
-    next_x = np.random.normal(mean, std)
-  
-    return next_x
-
-def simulate_process(mu_tz, M, t, y, u):
-    r"""
-
-    Simulation of Z_{t + u} using its distribution. CAMBIAR DEFINICION DE h A mu_tz
-
-    Parameters:
-    - mu_tz: It is the distribution of X given Z_t = y.
-      - If X is discrete, is rv_discrete.
-      - If X is continuous, is rv_continuous.
-    - M (int): Number of Monte Carlo simulations.
-    - t (float): Starting time of the process. Must satisfy 0 <= t < T.
-    - y (float): Position of the process at time t.
-    - u (float): If provided, the step size for the point of interest. Must satisfy t + u <= T.
-
-    Returns:
-    - Z_tu (np.array): If `u` is provided, returns the next value of the Brownian bridge at time t + u.
-
-    """
-    Z1 = mu_tz.rvs(size = M) # Generated randomly M values of the mu distribution
-    Z_tu = [] # Initialize Z_{t+u}
-    
-    for z1 in Z1:
-        Z_tu.append(simulate_brownian_bridge(t=t, z_t=y, T=1, z_T = z1, u=u)) # Simulations of Z_{t+u}
-    
-    return Z_tu
 
 
 # First step value function (backwards loop)
@@ -227,7 +173,7 @@ def value_function_first_step(mu, X_vals, M, dt, h_function):
 
 
 # Value function expectance
-def v_expectance(X_vals, M, t, dt, h_function, v):
+def v_expectance_1(X_vals, M, t, dt, h_function, v):
   r"""
 
   E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals.
