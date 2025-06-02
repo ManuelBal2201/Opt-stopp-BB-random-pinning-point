@@ -57,11 +57,11 @@ def mu_ty_simulator(mu, weights, parameters, y, M, t):
         probabilities = parameters[1]
         
         # Update probabilities
-        probabilities_tz_numerator = np.exp(points*y/(1-t)-t*points**2/(2*(1-t)))*probabilities
-        probabilities_tz = probabilities_tz_numerator/np.sum(probabilities_tz_numerator)
+        probabilities_ty_numerator = np.exp(points*y/(1-t)-t*points**2/(2*(1-t)))*probabilities
+        probabilities_ty = probabilities_ty_numerator/np.sum(probabilities_ty_numerator)
         
         # Sample distributions
-        selection = np.random.choice(list(range(0,parameters.shape[1])), size = M, p = probabilities_tz)
+        selection = np.random.choice(list(range(0,parameters.shape[1])), size = M, p = probabilities_ty)
         
         # Samples of \mu_{t,z}
         mu_ty = points[selection]
@@ -77,11 +77,14 @@ def mu_ty_simulator(mu, weights, parameters, y, M, t):
         
         m_tz = B/(2*A)
         gamma_tz = np.sqrt(1/(2*A))
-        weights_tz_numerator = weights * np.exp(C) * np.sqrt(np.pi/A)
-        weights_tz = weights_tz_numerator/np.sum(weights_tz_numerator)
+        if np.isinf(np.exp(C)).any(): # If there is an element np.exp(C), it is the only term in the expression of weight_ty of the same order as the denominator in the numerator 
+            weights_ty = (np.exp(C) == np.inf).astype(int)
+        else:
+            weights_ty_numerator = weights * np.exp(C) * np.sqrt(np.pi/A)
+            weights_ty = weights_ty_numerator/np.sum(weights_ty_numerator)
         
         # Sample distributions
-        selection = np.random.choice(list(range(0,parameters.shape[1])), size = M, p = weights_tz)
+        selection = np.random.choice(list(range(0,parameters.shape[1])), size = M, p = weights_ty)
         
         # Samples of \mu_{t,z}
         mu_ty = np.random.normal(loc=m_tz[selection], scale=gamma_tz[selection])
@@ -125,7 +128,11 @@ def compute_v_expec(mu, weights, parameters, x_val, M, t, u, interp_func):
     
     # Obtaining the value function for the obtained points
     v_new = interp_func(Z_tu)
-    return np.mean(v_new)
+    
+    # Compute E[V(t+s, Z_{t+s}) | Z_t = x_val]
+    v_expec = np.mean(v_new)
+    
+    return v_expec 
 
 ## Wrapper function to parallelize
 def parallel_loop(mu, weights, parameters, X_vals, M, t, u, interp_func):
