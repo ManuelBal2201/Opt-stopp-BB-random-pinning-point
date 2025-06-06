@@ -5,12 +5,15 @@ from functools import partial
 from scipy.interpolate import interp1d
 
 # Process simulation
-def simulate_brownian_bridge_3(t, z_t, T, z_T, u):
+def simulate_brownian_bridge_3(mu, t, z_t, T, z_T, u):
     r"""
 
     Simulates a Brownian bridge process between two fixed points.
 
     Parameters:
+    - mu (string): Type of mixture considered
+        - If X is discrete, is "discrete".
+        - If X is continuous, is "continuous".
     - t (float): Starting time of the process. Must satisfy 0 <= t < T.
     - z_t (float): Position of the process at time t.
     - T (float): Ending time of the process.
@@ -28,22 +31,37 @@ def simulate_brownian_bridge_3(t, z_t, T, z_T, u):
     # Obtain unique z_T values
     unique_z_T = np.unique(z_T)
     
-    for val in unique_z_T:
-        # Find indices where z_T == val
-        idx = np.where(z_T == val)[0]
+    if mu == "discrete":
+        # Initialize output array
+        next_x = np.zeros_like(z_T)
         
-        # Subset z_t for those indices
-        z_T_val = val
+        # Obtain unique z_T values
+        unique_z_T = np.unique(z_T)
         
-        # Brownian bridge step
-        mean = z_t + u * (z_T_val - z_t) / (T - t)
+        for val in unique_z_T:
+            # Find indices where z_T == val
+            idx = np.where(z_T == val)[0]
+            
+            # Subset z_t for those indices
+            z_T_val = val
+            
+            # Brownian bridge step
+            mean = z_t + u * (z_T_val - z_t) / (T - t)
+            var = u * (T - (t + u)) / (T - t)
+            std = np.sqrt(var)
+            
+            # Sample for all matching indices
+            next_x[idx] = np.random.normal(loc=mean, scale=std, size = len(idx))
+    else: 
+        # Brownian bridge step.
+        mean = z_t + u*(z_T - z_t)/(T - t)
         var = u * (T - (t + u)) / (T - t)
         std = np.sqrt(var)
+        next_x = np.random.normal(loc = mean, scale = std)
         
-        # Sample for all matching indices
-        next_x[idx] = np.random.normal(loc=mean, scale=std)
   
     return next_x
+  
 
 def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
     r"""
@@ -57,8 +75,8 @@ def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - y: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - y (float): Point of spatial grid that considered.
     - M (int): Number of samples.
     - t (float): Value of t (temporal variable).
     
@@ -125,8 +143,8 @@ def compute_v_expec_3(mu, weights, parameters, x_val, M, t, u, interp_func):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - x_val: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - x_val (float): Point of spatial grid that considered.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -140,7 +158,7 @@ def compute_v_expec_3(mu, weights, parameters, x_val, M, t, u, interp_func):
     mu_ty_points = mu_ty_simulator_3(mu = mu, weights = weights, parameters = parameters, y = x_val, M = M, t = t)
     
     # Simulate a brownian bridge that ends in the mu_tz_points. Keep only the value on t+u
-    Z_tu = simulate_brownian_bridge_3(t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
+    Z_tu = simulate_brownian_bridge_3(mu, t, z_t = x_val, T = 1, z_T = mu_ty_points, u = u)
     
     # Obtaining the value function for the obtained points
     v_new = interp_func(Z_tu)
@@ -163,8 +181,8 @@ def parallel_loop_3(mu, weights, parameters, X_vals, M, t, u, interp_func):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - x_val: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - x_val (float): Point of spatial grid that considered.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -195,8 +213,8 @@ def v_expectance_3(mu, weights, parameters, X_vals, M, t, u, v):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - X_vals: Spatial grid.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - X_vals (np.array): Spatial grid.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -231,7 +249,7 @@ def optimal_stopping_montecarlo_3(mu = "continuous", weights = np.array([1]), pa
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
     - N (int): Number of temporal steps.
     - a (float): Lower bound of the spatial grid.
     - b (float): Upper bound of the spatial grid.

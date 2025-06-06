@@ -42,8 +42,8 @@ def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - y: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - y (float): Point of spatial grid that considered.
     - M (int): Number of samples.
     - t (float): Value of t (temporal variable).
     
@@ -78,7 +78,7 @@ def mu_ty_simulator_2(mu, weights, parameters, y, M, t):
         m_tz = B/(2*A)
         gamma_tz = np.sqrt(1/(2*A))
         if np.isinf(np.exp(C)).any(): # If there is an element np.exp(C), it is the only term in the expression of weight_ty of the same order as the denominator in the numerator 
-            weights_ty_numerator = (np.exp(C) == np.inf).astype(int)
+            weights_ty_numerator = (np.exp(C) == np.inf).astype(int)*C
             weights_ty = weights_ty_numerator/np.sum(weights_ty_numerator)
         else:
             weights_ty_numerator = weights * np.exp(C) * np.sqrt(np.pi/A)
@@ -110,8 +110,8 @@ def compute_v_expec_2(mu, weights, parameters, x_val, M, t, u, interp_func):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - x_val: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - x_val (float): Point of spatial grid that considered.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -148,8 +148,8 @@ def parallel_loop_2(mu, weights, parameters, X_vals, M, t, u, interp_func):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - x_val: Point of spatial grid that considered.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - x_val (float): Point of spatial grid that considered.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -180,8 +180,8 @@ def v_expectance_2(mu, weights, parameters, X_vals, M, t, u, v):
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
-    - X_vals: Spatial grid.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
+    - X_vals (np.array): Spatial grid.
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
@@ -216,7 +216,7 @@ def optimal_stopping_montecarlo_2(mu = "continuous", weights = np.array([1]), pa
     - weights (np.array): Weights of each distribution in the mixture.
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
-        - If X is continuous, the first dimension is the mean, the second one is the variance.
+        - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
     - N (int): Number of temporal steps.
     - a (float): Lower bound of the spatial grid.
     - b (float): Upper bound of the spatial grid.
