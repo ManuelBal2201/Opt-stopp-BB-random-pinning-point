@@ -24,16 +24,9 @@ def simulate_brownian_bridge_3(mu, t, z_t, T, z_T, u):
     - next_x (float): If `u` is provided, returns the next value of the Brownian bridge at time t + u.
 
     """
-    
-    # Initialize output array
-    next_x = np.zeros_like(z_T)
-    
-    # Obtain unique z_T values
-    unique_z_T = np.unique(z_T)
-    
     if mu == "discrete":
         # Initialize output array
-        next_x = np.zeros_like(z_T)
+        next_x = np.zeros(len(z_T))
         
         # Obtain unique z_T values
         unique_z_T = np.unique(z_T)
@@ -72,7 +65,7 @@ def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
     - mu (string): Type of mixture considered
         - If X is discrete, is "discrete".
         - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
+    - weights (np.array): Weights of each distribution in the mixture. Only used if mu is "continuous".
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
@@ -90,8 +83,13 @@ def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
         probabilities = parameters[1]
         
         # Update probabilities
-        probabilities_ty_numerator = np.exp(points*y/(1-t)-t*points**2/(2*(1-t)))*probabilities
-        probabilities_ty = probabilities_ty_numerator/np.sum(probabilities_ty_numerator)
+        C = points*y/(1-t)-t*points**2/(2*(1-t))
+        if np.isinf(np.exp(C)).any(): # If there is an element np.exp(C), the trick explained in the thesis must be applied 
+            probabilities_ty_numerator = (np.exp(C) == np.inf).astype(int)*C*probabilities
+            probabilities_ty = probabilities_ty_numerator/np.sum(probabilities_ty_numerator)
+        else:
+            probabilities_ty_numerator = np.exp(C)*probabilities
+            probabilities_ty = probabilities_ty_numerator/np.sum(probabilities_ty_numerator)
         
         # Sample distributions
         selection = np.random.choice(list(range(0,parameters.shape[1])), size = M, p = probabilities_ty)
@@ -110,8 +108,8 @@ def mu_ty_simulator_3(mu, weights, parameters, y, M, t):
         
         m_tz = B/(2*A)
         gamma_tz = np.sqrt(1/(2*A))
-        if np.isinf(np.exp(C)).any(): # If there is an element np.exp(C), it is the only term in the expression of weight_ty of the same order as the denominator in the numerator 
-            weights_ty_numerator = (np.exp(C) == np.inf).astype(int)
+        if np.isinf(np.exp(C)).any(): # If there is an element np.exp(C), the trick explained in the thesis must be applied  
+            weights_ty_numerator = (np.exp(C) == np.inf).astype(int) * weights * C * np.sqrt(np.pi/A)
             weights_ty = weights_ty_numerator/np.sum(weights_ty_numerator)
         else:
             weights_ty_numerator = weights * np.exp(C) * np.sqrt(np.pi/A)
@@ -140,7 +138,7 @@ def compute_v_expec_3(mu, weights, parameters, x_val, M, t, u, interp_func):
     - mu (string): Type of mixture considered
         - If X is discrete, is "discrete".
         - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
+    - weights (np.array): Weights of each distribution in the mixture. Only used if mu is "continuous".
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
@@ -178,7 +176,7 @@ def parallel_loop_3(mu, weights, parameters, X_vals, M, t, u, interp_func):
     - mu (string): Type of mixture considered
         - If X is discrete, is "discrete".
         - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
+    - weights (np.array): Weights of each distribution in the mixture. Only used if mu is "continuous".
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
@@ -210,7 +208,7 @@ def v_expectance_3(mu, weights, parameters, X_vals, M, t, u, v):
     - mu (string): Type of mixture considered
         - If X is discrete, is "discrete".
         - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
+    - weights (np.array): Weights of each distribution in the mixture. Only used if mu is "continuous".
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
@@ -246,7 +244,7 @@ def optimal_stopping_montecarlo_3(mu = "continuous", weights = np.array([1]), pa
     - mu (string): Type of mixture considered
         - If X is discrete, is "discrete".
         - If X is continuous, is "continuous".
-    - weights (np.array): Weights of each distribution in the mixture.
+    - weights (np.array): Weights of each distribution in the mixture. Only used if mu is "continuous".
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.

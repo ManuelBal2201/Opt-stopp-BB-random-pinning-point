@@ -1,10 +1,9 @@
 # Libraries
 ## Mathematics
 import numpy as np
-from scipy.stats import rv_discrete, rv_continuous, norm
+from scipy.stats import rv_discrete, rv_continuous
 from scipy.integrate import quad
 from scipy.interpolate import interp1d
-import random
 
 def h_definition(pdf, support, is_discrete = False, x_vals = None, probs = None):
   """
