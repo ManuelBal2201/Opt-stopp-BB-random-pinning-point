@@ -1,7 +1,8 @@
 # Libraries
 import numpy as np
 from sklearn.mixture import GaussianMixture
-
+from scipy.stats import norm
+    
 # EM Algorithm
 def EM_Algorithm(Z_1, n_components = "BIC", n_components_trials = 15):
     """
@@ -105,3 +106,52 @@ def KDE(Z_1, bw_method = "Silverman"):
     parameters = np.array([unique_vals, np.full(shape = len(unique_vals), fill_value = h)])
     
     return weights, parameters
+
+# Log-likelihood of sigma
+def sigma_log_likelihood(sigma, tilde_z_t, tilde_t, tilde_m, tilde_gamma2, pi, T):
+    n = len(tilde_t)
+    k = len(tilde_m)
+    log_likelihood = 0
+
+    for i in range(n - 1):
+        ti = tilde_t[i] / T
+        tip1 = tilde_t[i+1] / T
+        tilde_z = tilde_z_t[i]
+        z_ti = (tilde_z_t[i] - tilde_z) / (sigma * np.sqrt(T))
+
+        inner_sum = 0
+        for j in range(k):
+            m_j = (tilde_m[j] - tilde_z) / (sigma * np.sqrt(T))
+            gamma_j2 = tilde_gamma2[j] / (sigma**2 * T)
+
+            A = ti / (2 * (1 - ti)) + 1 / (2 * gamma_j2)
+            B = z_ti / (1 - ti) + m_j / gamma_j2
+            C = (B**2) / (4 * A) - (m_j**2) / (2 * gamma_j2)
+
+            denom = 0
+            for h in range(k):
+                mh = (tilde_m[h] - tilde_z) / (sigma * np.sqrt(T))
+                gamma_h2 = tilde_gamma2[h] / (sigma**2 * T)
+                Ah = ti / (2 * (1 - ti)) + 1 / (2 * gamma_h2)
+                Bh = z_ti / (1 - ti) + mh / gamma_h2
+                Ch = (Bh**2) / (4 * Ah) - (mh**2) / (2 * gamma_h2)
+                denom += pi[h] * np.exp(Ch) * np.sqrt(np.pi / Ah)
+
+            w_ij = pi[j] * np.exp(C) * np.sqrt(np.pi / A) / denom
+            m_j_ti = B / (2 * A)
+            gamma_j_ti2 = 1 / (2 * A)
+
+            a_i = (tip1 - ti) / (1 - ti)
+            b_i = (1 - a_i) * z_ti
+            lambda2_i = (1 - tip1) * (tip1 - ti) / (1 - ti)
+            hat_lambda_i = np.sqrt(lambda2_i) / a_i
+            sigma2_ij = a_i**2 * (hat_lambda_i**2 + gamma_j_ti2)
+
+            z_tip1 = (tilde_z_t[i+1] - tilde_z) / (sigma * np.sqrt(T))
+            arg = z_tip1 - b_i - a_i * m_j_ti
+            phi_val = norm.pdf(arg, scale=np.sqrt(sigma2_ij))
+            inner_sum += w_ij * phi_val
+
+        log_likelihood += np.log(inner_sum)
+
+    return log_likelihood
