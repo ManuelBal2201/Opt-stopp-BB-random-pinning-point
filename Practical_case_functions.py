@@ -1,7 +1,11 @@
 # Libraries
 import numpy as np
+import pandas as pd
 from sklearn.mixture import GaussianMixture
 from scipy.stats import norm
+from scipy.interpolate import interp1d
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import LabelEncoder
     
 # EM Algorithm
 def EM_Algorithm(Z_1, n_components = "BIC", n_components_trials = 15):
@@ -108,50 +112,130 @@ def KDE(Z_1, bw_method = "Silverman"):
     return weights, parameters
 
 # Log-likelihood of sigma
-def sigma_log_likelihood(sigma, tilde_z_t, tilde_t, tilde_m, tilde_gamma2, pi, T):
+def sigma_log_likelihood_vectorized(volatility, tilde_z_t, tilde_t, tilde_m, tilde_gamma, weights):
+    # Ensure all inputs are NumPy arrays to avoid Pandas broadcasting issues
+    tilde_z_t = np.asarray(tilde_z_t)
+    tilde_t = np.asarray(tilde_t)
+    tilde_m = np.asarray(tilde_m)
+    tilde_gamma = np.asarray(tilde_gamma)
+    weights = np.asarray(weights)
+
+    # Normalize time and values
     n = len(tilde_t)
-    k = len(tilde_m)
-    log_likelihood = 0
+    t = tilde_t
+    z_t = (tilde_z_t - tilde_z_t[0]) / volatility
+    m = (tilde_m - tilde_z_t[0]) / volatility
+    gamma2 = (tilde_gamma ** 2) / (volatility ** 2)
 
-    for i in range(n - 1):
-        ti = tilde_t[i] / T
-        tip1 = tilde_t[i+1] / T
-        tilde_z = tilde_z_t[i]
-        z_ti = (tilde_z_t[i] - tilde_z) / (sigma * np.sqrt(T))
+    # Time steps and z-values at steps
+    ti = t[:-1]
+    ti1 = t[1:]
+    zti = z_t[:-1]
+    zti1 = z_t[1:]
 
-        inner_sum = 0
-        for j in range(k):
-            m_j = (tilde_m[j] - tilde_z) / (sigma * np.sqrt(T))
-            gamma_j2 = tilde_gamma2[j] / (sigma**2 * T)
+    # Expand shapes for broadcasting: (n-1, 1) + (k,) => (n-1, k)
+    A = ti[:, None] / (2 * (1 - ti[:, None])) + 1 / (2 * gamma2)
+    B = zti[:, None] / (1 - ti[:, None]) + m / gamma2
+    C = B**2 / (4 * A) - m**2 / (2 * gamma2)
 
-            A = ti / (2 * (1 - ti)) + 1 / (2 * gamma_j2)
-            B = z_ti / (1 - ti) + m_j / gamma_j2
-            C = (B**2) / (4 * A) - (m_j**2) / (2 * gamma_j2)
+    # Compute weights w_{i,j}
+    safe_exp_C = np.exp(C - np.max(C, axis=1, keepdims=True))  # for stability
+    weights_numerator = weights * safe_exp_C * np.sqrt(np.pi / A)
+    weights_ty = weights_numerator / weights_numerator.sum(axis=1, keepdims=True)
 
-            denom = 0
-            for h in range(k):
-                mh = (tilde_m[h] - tilde_z) / (sigma * np.sqrt(T))
-                gamma_h2 = tilde_gamma2[h] / (sigma**2 * T)
-                Ah = ti / (2 * (1 - ti)) + 1 / (2 * gamma_h2)
-                Bh = z_ti / (1 - ti) + mh / gamma_h2
-                Ch = (Bh**2) / (4 * Ah) - (mh**2) / (2 * gamma_h2)
-                denom += pi[h] * np.exp(Ch) * np.sqrt(np.pi / Ah)
+    # m_{j, t_i, z_ti}, gamma_{j, t_i, z_ti}
+    m_tz = B / (2 * A)
+    gamma_tz2 = 1 / (2 * A)
 
-            w_ij = pi[j] * np.exp(C) * np.sqrt(np.pi / A) / denom
-            m_j_ti = B / (2 * A)
-            gamma_j_ti2 = 1 / (2 * A)
+    # a_i, b_i, lambda_hat_i^2
+    a = (ti1 - ti) / (1 - ti)
+    b = (1 - a) * zti
+    lambda2 = (1 - ti1) * (ti1 - ti) / (1 - ti)
+    lambda_hat2 = lambda2 / a**2
 
-            a_i = (tip1 - ti) / (1 - ti)
-            b_i = (1 - a_i) * z_ti
-            lambda2_i = (1 - tip1) * (tip1 - ti) / (1 - ti)
-            hat_lambda_i = np.sqrt(lambda2_i) / a_i
-            sigma2_ij = a_i**2 * (hat_lambda_i**2 + gamma_j_ti2)
+    # Compute means and stds for norm.pdf
+    means = b[:, None] + a[:, None] * m_tz
+    stds = np.sqrt(a[:, None]**2 * (lambda_hat2[:, None] + gamma_tz2))
 
-            z_tip1 = (tilde_z_t[i+1] - tilde_z) / (sigma * np.sqrt(T))
-            arg = z_tip1 - b_i - a_i * m_j_ti
-            phi_val = norm.pdf(arg, scale=np.sqrt(sigma2_ij))
-            inner_sum += w_ij * phi_val
+    # Evaluate norm.pdf for each zti1[i] against each component j
+    pdf_vals = norm.pdf(zti1[:, None], loc=means, scale=stds)
 
-        log_likelihood += np.log(inner_sum)
+    # Weighted sum over j for each i
+    inner_sums = np.sum(weights_ty * pdf_vals, axis=1)
 
-    return log_likelihood
+    # Final log-likelihood
+    log_likelihood = np.sum(np.log(inner_sums))
+
+    return log_likelihood - (n - 1) * np.log(volatility)
+
+# Process classificator
+def process_classificator(N, value_function, X_vals, volatility, Z_0, pair_df, neighbours = 7):
+    r"""
+    
+   
+    
+    Parameters:
+    - N (int): Number of temporal steps.
+    - value_function (np.array): Value function for all the spatial points on each time step.
+    - X_vals (np.array): Spatial grid we are considering.
+    - pair
+    - neighbours
+    
+    Return:
+    - 
+    
+    """
+    
+    L = len(X_vals)
+    t_mesh = np.linspace(0, 1, N)    
+    
+    if N != L:
+        # Adjust meshgrid for different dimensions
+        T, X = np.meshgrid(t_mesh, np.linspace(np.min(X_vals), np.max(X_vals), L))
+    
+        # Interpole value_function to adjust `t_mesh`
+        interp_func = interp1d(t_mesh, value_function, axis=0, kind='linear', fill_value="extrapolate")
+        value_function_interp = interp_func(t_mesh)
+    
+        # Adjust X_vals to match value_function_interp
+        X_grid = np.linspace(np.min(X_vals), np.max(X_vals), L)
+        comparison = value_function_interp <= np.tile(X_grid, (N, 1))
+        
+        
+    else:
+        # Adjust meshgrid
+        T, X = np.meshgrid(t_mesh, X_vals)
+        
+        # Define colors and mapping
+        comparison = value_function <= np.tile(X_vals, (N, 1)) # Boolean matrix
+        
+    X = X*volatility + Z_0
+
+    # Flatten data and build DataFrame
+    df = pd.DataFrame({
+        'Temporal': T.flatten(),
+        'Spatial': X.flatten(),
+        'Comparison': comparison.flatten()
+    })
+    
+    # Encode Comparison to 0/1 for KNN 
+    le = LabelEncoder()
+    df['Comparison_encoded'] = le.fit_transform(df['Comparison'])
+    
+    # Train KNN Classifier 
+    X_train = df[['Temporal', 'Spatial']].values
+    y_train = df['Comparison_encoded'].values
+    knn = KNeighborsClassifier(n_neighbors=neighbours)
+    knn.fit(X_train, y_train)
+    
+    # Predict encoded labels
+    pred_encoded_all = knn.predict(pair_df.values)
+    
+    # Decode predictions back to original labels
+    pred_labels_all = le.inverse_transform(pred_encoded_all)
+    
+    # If desired, attach predictions to the input DataFrame
+    pair_df['Prediction'] = pred_labels_all
+
+    
+    return pair_df
