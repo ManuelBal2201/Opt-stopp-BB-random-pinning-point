@@ -7,7 +7,7 @@ from scipy.stats import norm
 def optimal_stopping_Brownian_bridge(t, r):
   """
 
-  Define the optimal stopping boundary given in (1) for for the particular case mu = r. REVISAR SI EL INDICE ES CORRECTO EN EL DEFINITIVO
+  Define the optimal stopping boundary given in (2.5.) for for the particular case mu = r.
 
   Parameters:
   - t (float): Time for which we want to know the optimal stopping boundary.
@@ -36,7 +36,7 @@ def compute_error(boundary_new, boundary):
     """
     numerator = np.linalg.norm(boundary_new - boundary)
     denominator = np.linalg.norm(boundary_new)
-    return numerator / denominator if denominator != 0 else float('inf')
+    return numerator / denominator if denominator != 0 else float('inf') # Assign as infinity if the denomitor is 0
 
 
 ## f_t evaluated in the upper limits of the integrals
@@ -77,7 +77,7 @@ def f_t_sup(m, gamma, t, b_t, u, b_tu):
 ## Optimal stopping boundary
 def optimal_stopping_Normal(mesh, m, gamma, tol=1e-3, max_iter=1000):
     """
-    Compute the optimal stopping boundary using a fixed-point Picard iteration.
+    Compute the optimal stopping boundary in Equation (2.10.) using a fixed-point Picard iteration.
 
     Parameters:
     - mesh (np.array): Temporal grid of [0,1].
@@ -91,12 +91,12 @@ def optimal_stopping_Normal(mesh, m, gamma, tol=1e-3, max_iter=1000):
     """
     N = len(mesh)-1 # Number of temporal steps removing the last step.
     c1 = (1 - gamma**2) # Constant 1.
-    boundary = np.full(N, m/c1)  # Initialize boundary with initial guess.
+    boundary = np.full(N, m/c1)  # Initialise boundary with initial guess.
 
-    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1) # h definition for this particular case.
+    h_normal = lambda t, z: (z * gamma**2 + m * (1 - t)) / (1 - t * c1) # h definition for the Normal distribution case.
 
     for iter in range(max_iter):
-        boundary_new = boundary.copy() # Initialize the boundary as first one.
+        boundary_new = boundary.copy() # Initialise the boundary as first one.
 
         for i in range(N - 2, -1, -1):  # Iterate backwards over the mesh.
             t = mesh[i] # Actual time.
@@ -116,7 +116,7 @@ def optimal_stopping_Normal(mesh, m, gamma, tol=1e-3, max_iter=1000):
         # Compute error and check for convergence.
         e = compute_error(boundary_new, boundary)
         if iter % 100 == 0:
-            print(iter, e)
+            print(iter, e) # Follow up every 100 iterations
         if e < tol:
             break
         boundary = boundary_new # Update boundary for the next iteration.

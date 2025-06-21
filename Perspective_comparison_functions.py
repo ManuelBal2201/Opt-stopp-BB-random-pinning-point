@@ -5,7 +5,7 @@ import numpy as np
 def simulate_brownian_bridge(t, z_t, T, z_T, u=None, n_steps=1000, volatility = 1):
     """
 
-    Simulates a Brownian bridge process between two fixed points.
+    Simulates a Brownian bridge between (t, z_t) and (T, z_T).
 
     Parameters:
     - t (float): Starting time of the process. Must satisfy 0 <= t < T.
@@ -37,7 +37,7 @@ def simulate_brownian_bridge(t, z_t, T, z_T, u=None, n_steps=1000, volatility = 
     else: # Return the full simulated BB path.
       all_times = np.linspace(t, T, n_steps) # Temporal grid.
       
-      # Initialize variables
+      # Initialise variables
       path = [z_t]
       current_t = t
       current_x = z_t

@@ -10,7 +10,7 @@ from sklearn.preprocessing import LabelEncoder
 # EM Algorithm
 def EM_Algorithm(Z_1, n_components = "BIC", n_components_trials = 15):
     """
-    Fits a Gaussian Mixture Model using the EM algorithm.
+    Fits Z_1 to a Gaussian mixture using the EM algorithm.
 
     Parameters:
     - Z_1 (np.array): Sample array.
@@ -26,42 +26,49 @@ def EM_Algorithm(Z_1, n_components = "BIC", n_components_trials = 15):
     """  
     Z_1 = Z_1.reshape(-1, 1)
     if isinstance(n_components, str):
-        if n_components == "BIC":
+        if n_components == "BIC": # Number of components chosen using BIC
+            # Initialise variables
             lowest_bic = np.inf
             bic_scores = []
             best_gmm = None
             n_components_range = range(1, n_components_trials)
             
+            # Apply EM algorithm from 1 Gaussian mixture to n_components_range Gaussian mixture
             for k in n_components_range:
+                # Apply EM algorithm
                 gmm = GaussianMixture(n_components = k, covariance_type = 'full', random_state = 123)
                 gmm.fit(Z_1)
+                
+                # Compute BIC
                 bic = gmm.bic(Z_1)
                 bic_scores.append(bic)
-            
+                
+                # Update the best Gaussian mixture if the current BIC is lower than the lowest previously computed
                 if bic < lowest_bic:
                     lowest_bic = bic
                     best_gmm = gmm
                     
             # Get best model parameters
-            best_n_components = n_components_range[np.argmin(bic_scores)]
-            weights = best_gmm.weights_
-            means = best_gmm.means_.flatten()
-            standard_deviations = np.sqrt(np.array([np.diag(cov) for cov in best_gmm.covariances_]).flatten())
-            parameters = np.row_stack((means, standard_deviations))
-            print(f"The lowest BIC was achieved with {best_n_components} components." )
+            best_n_components = n_components_range[np.argmin(bic_scores)] # Optimal number of components
+            weights = best_gmm.weights_ # Weights
+            means = best_gmm.means_.flatten() # Means
+            standard_deviations = np.sqrt(np.array([np.diag(cov) for cov in best_gmm.covariances_]).flatten()) # Standard deviation
+            parameters = np.row_stack((means, standard_deviations)) # Create parameters np.array to be directly introduced in optimal_stopping_montecarlo_3
+            print(f"The lowest BIC was achieved with {best_n_components} components." ) # Print the optimal number of components
             
         else:
             raise ValueError("If n_components is a string, it must be 'BIC'")
         
-    elif isinstance(n_components, int):
+    elif isinstance(n_components, int): # Number of components chosen specifically
+        # Apply EM Algorithm
         gmm = GaussianMixture(n_components = n_components, covariance_type = 'full', random_state = 123)
         gmm.fit(Z_1)
 
         # Get best model parameters
-        weights = gmm.weights_
-        means = gmm.means_.flatten()
-        standard_deviations = np.sqrt(np.array([np.diag(cov) for cov in gmm.covariances_]).flatten())
-        parameters = np.row_stack((means, standard_deviations))
+        weights = gmm.weights_ # Weights
+        means = gmm.means_.flatten() # Means
+        standard_deviations = np.sqrt(np.array([np.diag(cov) for cov in gmm.covariances_]).flatten()) # Standard deviations
+        parameters = np.row_stack((means, standard_deviations)) # Create parameters np.array to be directly introduced in optimal_stopping_montecarlo_3
         
     else:
         raise ValueError("bw_method must be a string or int.")
@@ -86,7 +93,7 @@ def KDE(Z_1, bw_method = "Silverman"):
     The first dimension is the mean, the second one is the standard deviation.
     
     """
-    # Initalize variables
+    # Initialise variables
     n = len(Z_1)
     sigma = np.std(Z_1, ddof=1)
     
@@ -104,15 +111,32 @@ def KDE(Z_1, bw_method = "Silverman"):
     else:
         raise ValueError("bw_method must be a string or float.")
     
-    # Compute the weights and parameters of the gaussian mixture. They are thought to be directly introduced in optimal_stopping_montecarlo_3
+    # Compute the weights and parameters of the Gaussian mixture. They are thought to be directly introduced in optimal_stopping_montecarlo_3
     unique_vals, inverse_indices, counts = np.unique(Z_1, return_inverse=True, return_counts=True)
-    weights = counts/sum(counts)
-    parameters = np.array([unique_vals, np.full(shape = len(unique_vals), fill_value = h)])
+    weights = counts/sum(counts) # Weights
+    parameters = np.array([unique_vals, np.full(shape = len(unique_vals), fill_value = h)]) # Create parameters np.array to be directly introduced in optimal_stopping_montecarlo_3
     
     return weights, parameters
 
 # Log-likelihood of sigma
 def sigma_log_likelihood_vectorized(volatility, tilde_z_t, tilde_t, tilde_m, tilde_gamma, weights):
+    """
+    
+    Volatility log-likelihood function value given all its variables.
+    
+    Parameters:
+    - volatility (float): Volatility of the process.
+    - tilde_z_t (np.array): Observations of the process.
+    - tilde_t (np.array): Times of the observations of the process.
+    - tilde_m (np.array): Means of the terminal density Gaussian mixture.
+    - tilde_gamma (np.array): Standard deviations of the terminal density Gaussian mixture.
+    - weights (np.array): Weights of the terminal density Gaussian mixture.
+    
+    Return:
+    - log-likelihood (float): Volatility log-likelihood function value given the inputs.
+    
+    """
+    
     # Ensure all inputs are NumPy arrays to avoid Pandas broadcasting issues
     tilde_z_t = np.asarray(tilde_z_t)
     tilde_t = np.asarray(tilde_t)
@@ -120,7 +144,7 @@ def sigma_log_likelihood_vectorized(volatility, tilde_z_t, tilde_t, tilde_m, til
     tilde_gamma = np.asarray(tilde_gamma)
     weights = np.asarray(weights)
 
-    # Normalize time and values
+    # Normalise time and values
     n = len(tilde_t)
     t = tilde_t
     z_t = (tilde_z_t - tilde_z_t[0]) / volatility
@@ -163,29 +187,32 @@ def sigma_log_likelihood_vectorized(volatility, tilde_z_t, tilde_t, tilde_m, til
     # Weighted sum over j for each i
     inner_sums = np.sum(weights_ty * pdf_vals, axis=1)
 
-    # Final log-likelihood
-    log_likelihood = np.sum(np.log(inner_sums))
+    # Final log-likelihood sum
+    log_likelihood_sum = np.sum(np.log(inner_sums))
 
-    return log_likelihood - (n - 1) * np.log(volatility)
+    return log_likelihood_sum - (n - 1) * np.log(volatility)
 
 # Process classificator
 def process_classificator(N, value_function, X_vals, volatility, Z_0, pair_df, neighbours = 7):
     r"""
     
-   
+    Identify if each observation of the process is in the stopping or in the continuation region.
     
     Parameters:
     - N (int): Number of temporal steps.
     - value_function (np.array): Value function for all the spatial points on each time step.
     - X_vals (np.array): Spatial grid we are considering.
-    - pair
-    - neighbours
+    - volatility (float): Volatility of the process.
+    - Z_0 (float): First observation of the process.
+    - pair_df (pd.dataframe): Process observations dataframe. The first column is the temporal point, and the second is the spatial.
+    - neighbours (int): Neighbours considered in KNN to assign a region for the observation.
     
     Return:
-    - 
+    - pair_df (pd.dataframe): Input process observations dataframe with a third columns: the predicted region.
     
     """
     
+    # Initialise variables
     L = len(X_vals)
     t_mesh = np.linspace(0, 1, N)    
     
@@ -208,14 +235,15 @@ def process_classificator(N, value_function, X_vals, volatility, Z_0, pair_df, n
         
         # Define colors and mapping
         comparison = value_function <= np.tile(X_vals, (N, 1)) # Boolean matrix
-        
+    
+    # Scale the spatial grid
     X = X*volatility + Z_0
 
     # Flatten data and build DataFrame
     df = pd.DataFrame({
         'Temporal': T.flatten(),
         'Spatial': X.flatten(),
-        'Comparison': comparison.flatten()
+        'Comparison': comparison.T.flatten()
     })
     
     # Encode Comparison to 0/1 for KNN 
@@ -234,7 +262,7 @@ def process_classificator(N, value_function, X_vals, volatility, Z_0, pair_df, n
     # Decode predictions back to original labels
     pred_labels_all = le.inverse_transform(pred_encoded_all)
     
-    # If desired, attach predictions to the input DataFrame
+    # Attach predictions to the input DataFrame
     pair_df['Prediction'] = pred_labels_all
 
     

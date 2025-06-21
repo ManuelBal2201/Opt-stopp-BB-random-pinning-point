@@ -16,10 +16,10 @@ def simulate_brownian_bridge_laws(t, z_t, T, z_T, u):
     - z_t (float): Position of the process at time t.
     - T (float): Ending time of the process.
     - z_T (np.array or float): Position of the process at time T.
-    - u (float): If provided, the step size for the point of interest. Must satisfy t + u <= T.
+    - u (float): Step size for the point of interest. Must satisfy t + u <= T.
 
     Returns:
-    - next_x (float): If `u` is provided, returns the next value of the Brownian bridge at time t + u.
+    - next_x (float): Next value of the Brownian bridge at time t + u.
 
     """
     
@@ -44,8 +44,8 @@ def mu_ty_simulator_laws(mu, weights, parameters, y, M, t):
     - parameters (np.array): Parameters of each distribution in the mixture. It is 2-dimensional array.
         - If X is discrete, the first dimension are the points where the probability is positive, the second one are the probabilities.
         - If X is continuous, the first dimension is the mean, the second one is the standard deviation.
-    - y (float): Point of spatial grid that considered.
-    - M (int): Number of samples.
+    - y (float): Point of spatial grid considered.
+    - M (int): Size of the sample.
     - t (float): Value of t (temporal variable).
     
     Return:
@@ -53,7 +53,7 @@ def mu_ty_simulator_laws(mu, weights, parameters, y, M, t):
     
     """
     if mu == "discrete":
-        # Initialize variables
+        # Initialise variables
         points = parameters[0]
         probabilities = parameters[1]
         
@@ -72,9 +72,9 @@ def mu_ty_simulator_laws(mu, weights, parameters, y, M, t):
         # Samples of \mu_{t,z}
         mu_ty = points[selection]
     elif mu == "continuous":
-        # Initialize variables
+        # Initialise variables
         m = parameters[0]
-        gamma2 = parameters[1]**2 # Square the standar deviation (2nd dimension of the parameters array)
+        gamma2 = parameters[1]**2 # Square the standard deviation (2nd dimension of the parameters array)
         
         # Update parameters and weights to t,z
         A = t/(2*(1 - t)) + 1/(2*gamma2)
@@ -121,10 +121,10 @@ def compute_v_expec_laws(mu, weights, parameters, x_val, M, t, u, interp_func):
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
-    - v (np.array): Value function in t+dt. The i-th element is the value function in the i-th point of X_vals.
+    - interp_func (function): Interpolator function taking v evaluated on X_vals.
     
     Return:
-    - v_expec (np.array): E[V(t+s, Z_{t+s}) | Z_t = x_val].
+    - v_expec (float): E[V(t+s, Z_{t+s}) | Z_t = x_val].
     
     """
     # Generate random points where the process may end
@@ -159,7 +159,7 @@ def parallel_loop_laws(mu, weights, parameters, X_vals, M, t, u, interp_func):
     - M (int): Number of Monte Carlo simulations.
     - t (float): Value of t (temporal variable).
     - u (float): Temporal step length.
-    - v (np.array): Value function in t+dt. The i-th element is the value function in the i-th point of X_vals.
+    - interp_func (function): Interpolator function taking v evaluated on X_vals.
     
     Return:
     - v_expec (np.array): E[V(t+s, Z_{t+s}) | Z_t = x_val].
@@ -201,7 +201,7 @@ def v_expectance_laws(mu, weights, parameters, X_vals, M, t, u, v):
     # Create an interpolator function
     interp_func = interp1d(X_vals, v, kind='linear', fill_value="extrapolate")
       
-    # Initialize E[V(t+s, Z_{t+s}) | Z_t = X_vals]
+    # Initialise E[V(t+s, Z_{t+s}) | Z_t = X_vals]
     v_expec = np.zeros(len(X_vals))
     
     # Expected value function
@@ -240,21 +240,21 @@ def optimal_stopping_montecarlo_laws(mu = "continuous", weights = np.array([1]),
     t_mesh = np.linspace(0, 1, N) # Temporal grid
     u = np.diff(t_mesh)[0] # Temporal step length
     X_vals = np.linspace(a, b, L) # Spatial grid
-    value_function = np.zeros((N, L))  # Initialize the array where the boundary points are saved
+    value_function = np.zeros((N, L))  # Initialise the array where the boundary points are saved
     value_function[N-2, :] = X_vals # Value function in t = 1
-    parallel_time = 0
+    parallel_time = 0 # Initialise parallel time count
     
     # Obtaining the boundary
     for j in range(N-2, 0, -1): # Loop for Z_{t + u}.
         if j % 100 == 0:
-            print(f"Temporal grid point: {j}")
+            print(f"Temporal grid point: {j}") # Follow up of current iteration every 100
         t = t_mesh[j-1] # Time of the step
-        M_t = int(M * (1 + alpha * (1 - t)))
+        M_t = int(M * (1 + alpha * (1 - t))) # Monte Carlo iterations for the current time
         
-        start = time()
+        start = time() # Start time on parallel in j-th iteration
         Expectance_V_next = v_expectance_laws(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :])
-        end = time()
-        parallel_time = parallel_time + (end-start)
+        end = time() # End time on parallel in j-th iteration
+        parallel_time = parallel_time + (end-start) # Update total parallel time
         
         value_function[j-1, :] = np.maximum(X_vals, Expectance_V_next) # Dynamic Principle
     

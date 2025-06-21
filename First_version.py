@@ -8,8 +8,8 @@ from scipy.interpolate import interp1d
 def h_definition(pdf, support, is_discrete = False, x_vals = None, probs = None):
   """
 
-  Define the function given in (2.3). REVISAR SI EL INDICE ES CORRECTO EN EL DEFINITIVO
-
+  Define the function given in (2.7).
+  
   Parameters:
   - pdf (function):  Probability density function of X if it is continuous.
   - support (list): Support of X if it is continuous. The first element is the lower bound an d the second is the upper bound.
@@ -118,8 +118,8 @@ def v_expectance(X_vals, M, t, dt, h_function, v):
   # Create an interpolator function.
   interp_func = interp1d(X_vals, v, kind='linear', fill_value="extrapolate")  # You can use 'linear', 'quadratic', 'cubic', etc.
 
-  # Initialize E[V(t+s, Z_{t+s}) | Z_t = X_vals].
-  v_expec = np.zeros(len(X_vals)) # Initialize the numpy array E[V(t+s, Z_{t+s}) | Z_t = X_vals].
+  # Initialise E[V(t+s, Z_{t+s}) | Z_t = X_vals].
+  v_expec = np.zeros(len(X_vals)) # Initialise the numpy array E[V(t+s, Z_{t+s}) | Z_t = X_vals].
 
   for i, x_val in enumerate(X_vals): # Loop for each value x_val of X_vals.
     Z_next = simulate_process(x_val, M, t, dt, h_function) # Simulations of the next step.
@@ -164,7 +164,7 @@ def optimal_stopping_montecarlo(mu = rv_discrete(name = 'Delta Dirac', values = 
     raise ValueError("mu must be a rv_discrete or rv_continuous variable.")
   h_function = lambda t, z: (z*gamma**2 + m*(1-t))/(1-t*(1-gamma**2)) # BORRAR
 
-  value_function = np.zeros((N, L))  # Initialize the array where the boundary points are saved.
+  value_function = np.zeros((N, L))  # Initialise the array where the boundary points are saved.
 
   value_function[N-2, :] = X_vals # Value function in t = 1-dt.
 
