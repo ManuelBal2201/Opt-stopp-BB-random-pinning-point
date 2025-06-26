@@ -102,7 +102,7 @@ def mu_ty_simulator_laws(mu, weights, parameters, y, M, t):
     return mu_ty
 
 
-# Value function expectance
+# Value function expectation
 ## Define function to run in parallel
 def compute_v_expec_laws(mu, weights, parameters, x_val, M, t, u, interp_func):
     r"""
@@ -174,7 +174,7 @@ def parallel_loop_laws(mu, weights, parameters, X_vals, M, t, u, interp_func):
     return v_expec
 
 ## Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals
-def v_expectance_laws(mu, weights, parameters, X_vals, M, t, u, v):
+def v_expectation_laws(mu, weights, parameters, X_vals, M, t, u, v):
     r"""
     
     Compute E[V(t+s, Z_{t+s}) | Z_t = x_val] for each value x_val in X_vals.
@@ -252,10 +252,10 @@ def optimal_stopping_montecarlo_laws(mu = "continuous", weights = np.array([1]),
         M_t = int(M * (1 + alpha * (1 - t))) # Monte Carlo iterations for the current time
         
         start = time() # Start time on parallel in j-th iteration
-        Expectance_V_next = v_expectance_laws(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :])
+        expectation_V_next = v_expectation_laws(mu, weights, parameters, X_vals, M_t, t, u, value_function[j, :])
         end = time() # End time on parallel in j-th iteration
         parallel_time = parallel_time + (end-start) # Update total parallel time
         
-        value_function[j-1, :] = np.maximum(X_vals, Expectance_V_next) # Dynamic Principle
+        value_function[j-1, :] = np.maximum(X_vals, expectation_V_next) # Dynamic Principle
     
     return value_function, X_vals, parallel_time
